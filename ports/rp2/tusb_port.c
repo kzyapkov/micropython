@@ -35,35 +35,42 @@
 #endif
 
 #if CFG_TUD_MSC
-#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN + TUD_MSC_DESC_LEN)
+#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + (TUD_CDC_DESC_LEN * CFG_TUD_CDC) + TUD_MSC_DESC_LEN)
 #else
-#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + TUD_CDC_DESC_LEN)
+#define USBD_DESC_LEN (TUD_CONFIG_DESC_LEN + (TUD_CDC_DESC_LEN * CFG_TUD_CDC))
 #endif
 #define USBD_MAX_POWER_MA (250)
 
-#define USBD_ITF_CDC (0) // needs 2 interfaces
-#define USBD_ITF_MSC (2)
+#define USBD_ITF_CDC0 (0) // needs 2 interfaces
+#define USBD_ITF_CDC1 (2) // needs 2 interfaces
+#define USBD_ITF_MSC (4)
 #if CFG_TUD_MSC
-#define USBD_ITF_MAX (3)
+#define USBD_ITF_MAX (5)
 #else
-#define USBD_ITF_MAX (2)
+#define USBD_ITF_MAX (4)
 #endif
 
-#define USBD_CDC_EP_CMD (0x81)
-#define USBD_CDC_EP_OUT (0x02)
-#define USBD_CDC_EP_IN (0x82)
 #define USBD_CDC_CMD_MAX_SIZE (8)
 #define USBD_CDC_IN_OUT_MAX_SIZE (64)
 
-#define EPNUM_MSC_OUT    (0x03)
-#define EPNUM_MSC_IN     (0x83)
+#define USBD_CDC0_EP_CMD (0x81)
+#define USBD_CDC0_EP_OUT (0x02)
+#define USBD_CDC0_EP_IN (0x82)
+
+#define USBD_CDC1_EP_CMD (0x83)
+#define USBD_CDC1_EP_OUT (0x04)
+#define USBD_CDC1_EP_IN (0x84)
+
+#define EPNUM_MSC_OUT    (0x05)
+#define EPNUM_MSC_IN     (0x85)
 
 #define USBD_STR_0 (0x00)
 #define USBD_STR_MANUF (0x01)
 #define USBD_STR_PRODUCT (0x02)
 #define USBD_STR_SERIAL (0x03)
-#define USBD_STR_CDC (0x04)
-#define USBD_STR_MSC (0x05)
+#define USBD_STR_CDC0 (0x04)
+#define USBD_STR_CDC1 (0x05)
+#define USBD_STR_MSC (0x06)
 
 // Note: descriptors returned from callbacks must exist long enough for transfer to complete
 
@@ -88,8 +95,12 @@ static const uint8_t usbd_desc_cfg[USBD_DESC_LEN] = {
     TUD_CONFIG_DESCRIPTOR(1, USBD_ITF_MAX, USBD_STR_0, USBD_DESC_LEN,
         0, USBD_MAX_POWER_MA),
 
-    TUD_CDC_DESCRIPTOR(USBD_ITF_CDC, USBD_STR_CDC, USBD_CDC_EP_CMD,
-        USBD_CDC_CMD_MAX_SIZE, USBD_CDC_EP_OUT, USBD_CDC_EP_IN, USBD_CDC_IN_OUT_MAX_SIZE),
+    TUD_CDC_DESCRIPTOR(USBD_ITF_CDC0, USBD_STR_CDC0, USBD_CDC0_EP_CMD,
+        USBD_CDC_CMD_MAX_SIZE, USBD_CDC0_EP_OUT, USBD_CDC0_EP_IN, USBD_CDC_IN_OUT_MAX_SIZE),
+
+    TUD_CDC_DESCRIPTOR(USBD_ITF_CDC1, USBD_STR_CDC1, USBD_CDC1_EP_CMD,
+        USBD_CDC_CMD_MAX_SIZE, USBD_CDC1_EP_OUT, USBD_CDC1_EP_IN, USBD_CDC_IN_OUT_MAX_SIZE),
+
     #if CFG_TUD_MSC
     TUD_MSC_DESCRIPTOR(USBD_ITF_MSC, 5, EPNUM_MSC_OUT, EPNUM_MSC_IN, 64),
     #endif
@@ -97,9 +108,10 @@ static const uint8_t usbd_desc_cfg[USBD_DESC_LEN] = {
 
 static const char *const usbd_desc_str[] = {
     [USBD_STR_MANUF] = "MicroPython",
-    [USBD_STR_PRODUCT] = "Board in FS mode",
+    [USBD_STR_PRODUCT] = "MP with ACM",
     [USBD_STR_SERIAL] = NULL, // generated dynamically
-    [USBD_STR_CDC] = "Board CDC",
+    [USBD_STR_CDC0] = "Board CDC",
+    [USBD_STR_CDC1] = "DUT CDC",
     #if CFG_TUD_MSC
     [USBD_STR_MSC] = "Board MSC",
     #endif

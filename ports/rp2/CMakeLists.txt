@@ -129,6 +129,7 @@ set(MICROPY_SOURCE_PORT
     uart.c
     msc_disk.c
     mbedtls/mbedtls_port.c
+    tty_acm.c
 )
 
 set(MICROPY_SOURCE_QSTR

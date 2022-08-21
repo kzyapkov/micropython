@@ -34,6 +34,7 @@
 #include "uart.h"
 #include "hardware/rtc.h"
 #include "pico/unique_id.h"
+#include "tty_acm.h"
 
 #if MICROPY_PY_NETWORK_CYW43
 #include "lib/cyw43-driver/src/cyw43.h"
@@ -69,6 +70,10 @@ void poll_cdc_interfaces(void) {
 }
 
 void tud_cdc_rx_cb(uint8_t itf) {
+    if (itf != 0) {
+        tty_acm_rx_cb(itf);
+        return;
+    }
     // consume pending USB data immediately to free usb buffer and keep the endpoint from stalling.
     // in case the ringbuffer is full, mark the CDC interface that need attention later on for polling
     cdc_itf_pending &= ~(1 << itf);

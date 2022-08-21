@@ -36,6 +36,8 @@
 #include "hardware/regs/uart.h"
 #include "pico/mutex.h"
 
+#include "tusb_config.h"
+
 #define DEFAULT_UART_BAUDRATE (115200)
 #define DEFAULT_UART_BITS (8)
 #define DEFAULT_UART_STOP (1)
@@ -109,9 +111,11 @@ STATIC machine_uart_obj_t machine_uart_obj[] = {
     {{&machine_uart_type}, uart0, 0, 0, DEFAULT_UART_BITS, UART_PARITY_NONE, DEFAULT_UART_STOP,
      MICROPY_HW_UART0_TX, MICROPY_HW_UART0_RX, MICROPY_HW_UART0_CTS, MICROPY_HW_UART0_RTS,
      0, 0, 0, 0, {NULL, 1, 0, 0}, &read_mutex_0, {NULL, 1, 0, 0}, &write_mutex_0},
+#if CFG_TUD_CDC == 1
     {{&machine_uart_type}, uart1, 1, 0, DEFAULT_UART_BITS, UART_PARITY_NONE, DEFAULT_UART_STOP,
      MICROPY_HW_UART1_TX, MICROPY_HW_UART1_RX, MICROPY_HW_UART1_CTS, MICROPY_HW_UART1_RTS,
      0, 0, 0, 0, {NULL, 1, 0, 0}, &read_mutex_1, {NULL, 1, 0, 0}, &write_mutex_1},
+#endif
 };
 
 STATIC const char *_parity_name[] = {"None", "0", "1"};
@@ -399,6 +403,10 @@ STATIC mp_obj_t machine_uart_make_new(const mp_obj_type_t *type, size_t n_args, 
 STATIC mp_obj_t machine_uart_init(size_t n_args, const mp_obj_t *args, mp_map_t *kw_args) {
     // Initialise the UART peripheral.
     machine_uart_init_helper(args[0], n_args - 1, args + 1, kw_args);
+#if CFG_TUD_CDC > 1
+    (void) read_mutex_1;
+    (void) write_mutex_1;
+#endif
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(machine_uart_init_obj, 1, machine_uart_init);
