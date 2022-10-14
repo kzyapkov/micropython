@@ -26,6 +26,12 @@ static alarm_id_t break_alarm = 0;
 ringbuf_t uart2usb_buf;
 auto_init_mutex(uart2usb_mutex);
 
+ringbuf_t usb2uart_buf;
+// auto_init_mutex(usb2uart_mutex);
+
+static mp_sched_node_t tty_acm_uart2usb_sched_node;
+static mp_sched_node_t tty_acm_usb2uart_sched_node;
+
 static int64_t _break_timer_cb(alarm_id_t id, void *user_data) {
     break_alarm = 0;
     uart_set_break(_CDC_UART, false);
@@ -54,7 +60,15 @@ static inline unsigned _drain_uart() {
     return transferred;
 }
 
-STATIC mp_sched_node_t tty_acm_uart2usb_sched_node;
+static inline unsigned _flush_uart() {
+    unsigned transferred = 0;
+    while (uart_is_writable(_CDC_UART) && ringbuf_avail(&usb2uart_buf) > 0) {
+        char c = ringbuf_get(&usb2uart_buf);
+        uart_putc_raw(_CDC_UART, c);
+        transferred++;
+    }
+    return transferred;
+}
 
 STATIC void tty_acm_flush_uart2usb(struct _mp_sched_node_t *node) {
     uint8_t buf[CFG_TUD_CDC_EP_BUFSIZE];
@@ -75,6 +89,7 @@ STATIC void tty_acm_flush_uart2usb(struct _mp_sched_node_t *node) {
     }
     tud_cdc_n_write(_CDC_TUD_ITF, buf, i);
     tud_cdc_n_write_flush(_CDC_TUD_ITF);
+    tud_task();
 
     mp_sched_schedule_node(&tty_acm_uart2usb_sched_node, tty_acm_flush_uart2usb);
 
@@ -109,6 +124,7 @@ void init_cdc_uart(void) {
     uart_set_hw_flow(_CDC_UART, false, false);
 
     ringbuf_alloc(&uart2usb_buf, 1024);
+    ringbuf_alloc(&usb2uart_buf, 1024);
 
     irq_set_exclusive_handler(_CDC_UART_IRQ, tty_acm_uart_irq_handler);
     irq_set_enabled(_CDC_UART_IRQ, true);
@@ -118,13 +134,25 @@ void init_cdc_uart(void) {
 
 }
 
-void tty_acm_rx_cb(uint8_t itf) {
-    if (itf != 1) return;
-    while (tud_cdc_n_available(itf)) {
-        int32_t data_char = tud_cdc_n_read_char(itf);
-        if (data_char < 0) break;
-        uart_putc_raw(_CDC_UART, data_char);
+
+static void tty_acm_flush_usb2uart(struct _mp_sched_node_t *node) {
+    _flush_uart();
+    while (tud_cdc_n_available(_CDC_TUD_ITF) && ringbuf_free(&usb2uart_buf)) {
+        int32_t c = tud_cdc_n_read_char(_CDC_TUD_ITF);
+        if (c < 0) break;
+        ringbuf_put(&usb2uart_buf, (uint8_t)c);
     }
+    _flush_uart();
+    MICROPY_EVENT_POLL_HOOK
+    if (tud_cdc_n_available(_CDC_TUD_ITF) || ringbuf_avail(&usb2uart_buf)) {
+        mp_sched_schedule_node(&tty_acm_usb2uart_sched_node, tty_acm_flush_usb2uart);
+    }
+}
+
+
+void tty_acm_rx_cb(uint8_t itf) {
+    if (itf != _CDC_TUD_ITF) return;
+    tty_acm_flush_usb2uart(&tty_acm_usb2uart_sched_node);
 }
 
 // Invoked when line state DTR & RTS are changed via SET_CONTROL_LINE_STATE
